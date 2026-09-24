@@ -28,9 +28,9 @@ jobs:
     #   3. The event is one of:
     #        - a freshly opened PR (always reviewed on open),
     #        - a 'claude-review' label being added (manual trigger), or
-    #        - a push to a PR that already carries the 'claude-review' label
-    #          (so subsequent commits keep getting reviewed without re-labeling).
-    #          Remove the label to stop per-push reviews.
+    #        - a push to a PR that still carries the 'claude-review' label
+    #          (commits pushed while a labeled review is in flight).
+    #   The final step removes the label, so each label add buys one review.
     if: ${{
       !endsWith(github.actor, '[bot]') &&
       !github.event.pull_request.head.repo.fork &&
@@ -43,7 +43,7 @@ jobs:
 
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write # Remove claude-review label step
       issues: read
       id-token: write
 
@@ -101,3 +101,23 @@ jobs:
 
           # Optional: Add specific tools for running tests or linting
           # allowed_tools: "Bash(bundle exec rspec),Bash(bundle exec rubocop)"
+
+      - name: Remove claude-review label
+        # Remove label whether success or failure - prevents getting stuck
+        if: always() && github.event.action != 'opened'
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'claude-review'
+              });
+            } catch (error) {
+              // 404 is the benign case. Anything else (e.g. a 403 from
+              // missing permissions) should fail the step, not hide.
+              if (error.status !== 404) throw error;
+              console.log('Label not found or already removed');
+            }
