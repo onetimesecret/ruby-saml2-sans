@@ -53,28 +53,34 @@ jobs:
         with:
           fetch-depth: 1
 
-      # Note: This workflow has been observed to fail with "null is not an object
-      # (evaluating 'c.body')". Deleting PR comments before/during execution may
-      # be related. Re-run after comment activity settles.
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@28f83620103c48a57093dcc2837eec89e036bb9f # beta (v0.0.63)
+        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1.0.234 (Claude Code 2.1.282)
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # Model selection. The action's own default (claude-sonnet-4-20250514)
-          # is retired and 404s before the run starts, so this must always
-          # resolve to something live. Set the ANTHROPIC_MODEL repo variable to
-          # change models without a PR; the literal is the floor, so an unset or
-          # cleared variable stays harmless (an empty value would hand the action
-          # back its own retired default). Spelled out rather than passed as the
-          # 'opus' alias: this ref bundles Claude Code 1.0.88, which resolves
-          # aliases against its own build-time table, itself naming retired ids.
-          model: "${{ vars.ANTHROPIC_MODEL || 'claude-opus-5' }}"
-          fallback_model: "${{ vars.CLAUDE_FALLBACK_MODEL || 'claude-haiku-4-5-20251001' }}"
+          # Tag mode with a tracking comment. Combined with use_sticky_comment,
+          # each run rewrites the same PR comment instead of adding a new one.
+          # Supported on opened, synchronize, and labeled.
+          track_progress: true
+          use_sticky_comment: true
 
-          # Direct prompt for automated review (no @claude mention needed)
-          direct_prompt: |
+          # Model selection. Set the ANTHROPIC_MODEL / CLAUDE_FALLBACK_MODEL repo
+          # variables to change models without a PR; the literals apply when a
+          # variable is unset or empty.
+          #
+          # Tag mode can edit files and commit to the PR branch by default; the
+          # review is read-only, so those tools are denied.
+          claude_args: |
+            --model ${{ vars.ANTHROPIC_MODEL || 'opus' }}
+            --fallback-model ${{ vars.CLAUDE_FALLBACK_MODEL || 'claude-haiku-4-5-20251001' }}
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "Edit,MultiEdit,Write,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*)"
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
             Review this PR for defects. Report only findings you can state
             as a concrete failure scenario (specific input or state leading
             to wrong output, data loss, or a security consequence), with
@@ -96,11 +102,8 @@ jobs:
             scenario may be raised as explicitly non-blocking follow-up
             suggestions, at most two per review, clearly marked as such.
 
-          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
-          use_sticky_comment: true
-
-          # Optional: Add specific tools for running tests or linting
-          # allowed_tools: "Bash(bundle exec rspec),Bash(bundle exec rubocop)"
+            Report in the tracking comment only. Do not modify files or
+            push commits.
 
       - name: Remove claude-review label
         # Remove label whether success or failure - prevents getting stuck
