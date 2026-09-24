@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    saml2 (3.3.1)
+    ruby-saml2-sans (3.3.1)
       nokogiri (>= 1.5.8, < 2.0)
       nokogiri-xmlsec-instructure (~> 0.9, >= 0.9.5)
 
@@ -113,7 +113,7 @@ DEPENDENCIES
   rubocop-inst (~> 1)
   rubocop-rake (~> 0.6)
   rubocop-rspec (~> 3.5)
-  saml2!
+  ruby-saml2-sans!
 
 BUNDLED WITH
    2.4.10

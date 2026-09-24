@@ -11,3 +11,7 @@ AllCops:
 
 Style/Documentation:
   Enabled: false
+
+Naming/FileName:
+  Exclude:
+    - lib/ruby-saml2-sans.rb # matches the gem name for Bundler.require
