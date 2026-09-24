@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "saml2/array_wrap"
 require "saml2/key"
 
 module SAML2
@@ -73,7 +74,7 @@ module SAML2
       end
       certs = certs.uniq
 
-      trusted_keys = Array.wrap(key).map(&:to_s)
+      trusted_keys = ArrayWrap.wrap(key).map(&:to_s)
       trusted_keys.concat(certs.map do |certificate|
         certificate = OpenSSL::X509::Certificate.new(certificate) if certificate.is_a?(String)
         certificate.public_key.to_s

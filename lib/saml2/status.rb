@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "saml2/array_wrap"
 require "saml2/base"
 
 module SAML2
@@ -67,7 +68,7 @@ module SAML2
     end
 
     def codes=(value)
-      codes = Array.wrap(value)
+      codes = ArrayWrap.wrap(value)
       unless TOP_LEVEL_STATUS_CODES.include?(codes.first)
         raise ArgumentError, "Invalid top level status code #{codes.first.inspect}"
       end
