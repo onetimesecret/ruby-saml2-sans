@@ -28,6 +28,10 @@ Gem::Specification.new do |s|
 
   s.required_ruby_version = ">= 3.2"
 
+  # base64 left the default gems in Ruby 3.4. It used to arrive
+  # transitively through ActiveSupport.
+  s.add_dependency "base64", "~> 0.2"
+
   # Very specifically at least 1.5.8 - they fixed a bug with namespaces
   # on root elements with XML::Builder in that release
   s.add_dependency "nokogiri", ">= 1.5.8", "< 2.0"
