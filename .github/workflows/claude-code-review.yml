@@ -1,0 +1,126 @@
+# .github/workflows/claude-code-review.yml
+#
+# Required GitHub Actions secret:
+#   CLAUDE_CODE_OAUTH_TOKEN   OAuth token for the anthropics/claude-code-action
+
+name: Claude Code Review
+
+on:
+  pull_request:
+    branches:
+      - 'feature/*'
+      - 'fix/*'
+      - 'wip/*'
+      - 'rel/*'
+      - 'develop'
+      - 'main'
+    types: [opened, synchronize, labeled]
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    # Run only when ALL of the following are true:
+    #   1. Author is not a bot (renovate, dependabot, etc. surface as 'name[bot]' in github.actor).
+    #   2. PR head is not from a fork. Fork PRs run without access to repository
+    #      secrets, so CLAUDE_CODE_OAUTH_TOKEN is empty and the action would fail.
+    #      External contributions should be reviewed manually or via a maintainer-triggered
+    #      workflow that runs against the merged ref.
+    #   3. The event is one of:
+    #        - a freshly opened PR (always reviewed on open),
+    #        - a 'claude-review' label being added (manual trigger), or
+    #        - a push to a PR that still carries the 'claude-review' label
+    #          (commits pushed while a labeled review is in flight).
+    #   The final step removes the label, so each label add buys one review.
+    if: ${{
+      !endsWith(github.actor, '[bot]') &&
+      !github.event.pull_request.head.repo.fork &&
+      (
+        (github.event.action == 'opened') ||
+        (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
+        (github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'claude-review'))
+      )
+      }}
+
+    permissions:
+      contents: read
+      pull-requests: write # Remove claude-review label step
+      issues: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code Review
+        id: claude-review
+        uses: anthropics/claude-code-action@9171db3e57d6a3140a37ddc2ba92788584e0ead6 # v1.0.234 (Claude Code 2.1.282)
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+          # Tag mode with a tracking comment. Combined with use_sticky_comment,
+          # each run rewrites the same PR comment instead of adding a new one.
+          # Supported on opened, synchronize, and labeled.
+          track_progress: true
+          use_sticky_comment: true
+
+          # Model selection. Set the ANTHROPIC_MODEL / CLAUDE_FALLBACK_MODEL repo
+          # variables to change models without a PR; the literals apply when a
+          # variable is unset or empty.
+          #
+          # Tag mode can edit files and commit to the PR branch by default; the
+          # review is read-only, so those tools are denied.
+          claude_args: |
+            --model ${{ vars.ANTHROPIC_MODEL || 'opus' }}
+            --fallback-model ${{ vars.CLAUDE_FALLBACK_MODEL || 'claude-haiku-4-5-20251001' }}
+            --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*)"
+            --disallowedTools "Edit,MultiEdit,Write,NotebookEdit,Bash(git add:*),Bash(git commit:*),Bash(git rm:*)"
+
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this PR for defects. Report only findings you can state
+            as a concrete failure scenario (specific input or state leading
+            to wrong output, data loss, or a security consequence), with
+            file and line.
+
+            This is a SAML 2.0 library. Signature verification, XML parsing,
+            and assertion/response validation are security-critical: a check
+            that can be bypassed, skipped, or satisfied by the wrong element
+            is a defect.
+
+            Do not comment on: style or formatting (rubocop gates these),
+            missing stdlib requires, typos, test file organization, or
+            pre-existing code outside this PR's changes.
+
+            Do not summarize the PR, restate the diff, or praise the code.
+            If nothing meets the bar, say exactly that in one sentence.
+
+            Structural or architectural observations without a failure
+            scenario may be raised as explicitly non-blocking follow-up
+            suggestions, at most two per review, clearly marked as such.
+
+            Report in the tracking comment only. Do not modify files or
+            push commits.
+
+      - name: Remove claude-review label
+        # Remove label whether success or failure - prevents getting stuck
+        if: always() && github.event.action != 'opened'
+        uses: actions/github-script@d746ffe35508b1917358783b479e04febd2b8f71 # v9.0.0
+        with:
+          script: |
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: 'claude-review'
+              });
+            } catch (error) {
+              // 404 is the benign case. Anything else (e.g. a 403 from
+              // missing permissions) should fail the step, not hide.
+              if (error.status !== 404) throw error;
+              console.log('Label not found or already removed');
+            }
