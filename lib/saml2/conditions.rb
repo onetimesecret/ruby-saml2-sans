@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/array/wrap"
+require "saml2/array_wrap"
 
 module SAML2
   class Conditions < Array
@@ -114,8 +114,8 @@ module SAML2
       def validate(audience: nil, ignore_audience_condition: false, **_)
         return [] if ignore_audience_condition
 
-        unless Array.wrap(self.audience).include?(audience)
-          return ["audience #{audience} not in allowed list of #{Array.wrap(self.audience).join(", ")}"]
+        unless ArrayWrap.wrap(self.audience).include?(audience)
+          return ["audience #{audience} not in allowed list of #{ArrayWrap.wrap(self.audience).join(", ")}"]
         end
 
         []
@@ -124,7 +124,7 @@ module SAML2
       # (see Base#build)
       def build(builder)
         builder["saml"].AudienceRestriction do |audience_restriction|
-          Array.wrap(audience).each do |single_audience|
+          ArrayWrap.wrap(audience).each do |single_audience|
             audience_restriction["saml"].Audience(single_audience)
           end
         end

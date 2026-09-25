@@ -1,0 +1,39 @@
+name: Ruby Lint
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    name: RuboCop
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Bundler installs the full bundle, including the native xmlsec gem.
+      - name: Install libxmlsec1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxmlsec1-dev pkg-config
+
+      # RuboCop is pinned to TargetRubyVersion 3.2 in .rubocop.yml, so one
+      # Ruby is enough; results don't change across the test matrix.
+      - uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+
+      - name: Run RuboCop
+        run: bundle exec rubocop --format github

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "saml2/array_wrap"
 require "saml2/name_id"
 require "saml2/namespaces"
 
@@ -28,7 +29,7 @@ module SAML2
 
     # @return [Confirmation, nil]
     def confirmation
-      Array.wrap(confirmations).first
+      ArrayWrap.wrap(confirmations).first
     end
 
     # @return [Confirmation, nil]

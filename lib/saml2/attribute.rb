@@ -2,7 +2,7 @@
 
 require "date"
 
-require "active_support/core_ext/array/wrap"
+require "saml2/array_wrap"
 
 require "saml2/base"
 require "saml2/namespaces"
@@ -96,7 +96,7 @@ module SAML2
       builder[self.class.namespace].__send__(self.class.element, "Name" => name) do |attribute|
         attribute.parent["FriendlyName"] = friendly_name if friendly_name
         attribute.parent["NameFormat"] = name_format if name_format
-        Array.wrap(value).each do |value|
+        ArrayWrap.wrap(value).each do |value|
           xsi_type, val = convert_to_xsi(value)
           attribute["saml"].AttributeValue(val) do |attribute_value|
             attribute_value.parent["xsi:type"] = xsi_type if xsi_type
@@ -139,7 +139,7 @@ module SAML2
       xs_type = nil
       converter = nil
       XS_TYPES.each do |type, (klasses, to_xsi, _from_xsi)|
-        next unless Array.wrap(klasses).any? { |klass| value.is_a?(klass) }
+        next unless ArrayWrap.wrap(klasses).any? { |klass| value.is_a?(klass) }
 
         xs_type = "xs:#{type.last}"
         converter = to_xsi
@@ -195,7 +195,7 @@ module SAML2
 
         prior_value = result[key]
         result[key] = if prior_value
-                        value = Array.wrap(prior_value)
+                        value = ArrayWrap.wrap(prior_value)
                         # repeated key; convert to array
                         if attribute.value.is_a?(Array)
                           # both values are arrays; concatenate them

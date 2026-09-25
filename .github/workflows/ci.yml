@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    name: "RSpec (Ruby ${{ matrix.ruby }}, ${{ matrix.lockfile }})"
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each Ruby runs twice: once against the committed Gemfile.lock and
+        # once with the lockfile removed so Bundler resolves the newest
+        # versions the gemspec allows. The unlocked cells catch nokogiri or
+        # nokogiri-xmlsec-instructure releases that satisfy our constraints
+        # but break this library.
+        include:
+          - ruby: "3.2"
+            experimental: false
+            lockfile: "locked"
+          - ruby: "3.3"
+            experimental: false
+            lockfile: "locked"
+          - ruby: "3.4"
+            experimental: false
+            lockfile: "locked"
+          - ruby: "4.0"
+            experimental: true
+            lockfile: "locked"
+          - ruby: "3.2"
+            experimental: false
+            lockfile: "unlocked"
+          - ruby: "3.3"
+            experimental: false
+            lockfile: "unlocked"
+          - ruby: "3.4"
+            experimental: false
+            lockfile: "unlocked"
+          - ruby: "4.0"
+            experimental: true
+            lockfile: "unlocked"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # nokogiri-xmlsec-instructure compiles against libxmlsec1. This must
+      # run before setup-ruby, whose bundler-cache step runs bundle install.
+      - name: Install libxmlsec1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libxmlsec1-dev pkg-config
+
+      - name: Drop lockfile
+        if: ${{ matrix.lockfile == 'unlocked' }}
+        run: rm -f Gemfile.lock
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
+        continue-on-error: ${{ matrix.experimental }}
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          # The cache keys off Gemfile.lock, so only use it for locked cells.
+          bundler-cache: ${{ matrix.lockfile == 'locked' }}
+
+      - name: Install dependencies
+        if: ${{ matrix.lockfile == 'unlocked' }}
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Run specs
+        run: bundle exec rspec --format progress
+
+      # This fork exists to drop ActiveSupport. Fail if loading the library
+      # pulls it in again, whether through lib/ or a runtime dependency.
+      - name: Check ActiveSupport is not loaded
+        run: |
+          bundle exec ruby -e '
+            require "saml2"
+            abort "ActiveSupport was loaded by require \"saml2\"" if defined?(ActiveSupport)
+          '
+
+  package:
+    timeout-minutes: 5
+    runs-on: ubuntu-24.04
+    name: Gem build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
+        with:
+          ruby-version: "3.4"
+
+      # --strict turns gemspec warnings into failures.
+      - name: Build gem
+        run: gem build --strict ruby-saml2-sans.gemspec
+
+      - name: Check runtime dependencies
+        run: |
+          deps=$(ruby -e 'puts Gem::Specification.load("ruby-saml2-sans.gemspec").runtime_dependencies.map(&:name)')
+          echo "$deps"
+          if echo "$deps" | grep -qx activesupport; then
+            echo "activesupport must not be a runtime dependency" >&2
+            exit 1
+          fi

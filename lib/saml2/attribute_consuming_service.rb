@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/array/wrap"
+require "saml2/array_wrap"
 
 require "saml2/attribute"
 require "saml2/indexed_object"
@@ -80,7 +80,7 @@ module SAML2
     def initialize(requested_attribute, provided_value)
       super("Attribute #{requested_attribute.name} is provided value " \
             "#{provided_value.inspect}, but only allows " \
-            "#{Array.wrap(requested_attribute.value).inspect}")
+            "#{ArrayWrap.wrap(requested_attribute.value).inspect}")
       @requested_attribute = requested_attribute
       @provided_value = provided_value
     end
@@ -142,7 +142,7 @@ module SAML2
         if attr
           attr.value = attr.value.call if attr.value.respond_to?(:call)
           if requested_attr.value &&
-             !Array.wrap(requested_attr.value).include?(attr.value)
+             !ArrayWrap.wrap(requested_attr.value).include?(attr.value)
             raise InvalidAttributeValue.new(requested_attr, attr.value)
           end
 

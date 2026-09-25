@@ -6,7 +6,7 @@ RUN apt-get update && \
 
 RUN mkdir /app
 WORKDIR /app
-COPY Gemfile Gemfile.lock saml2.gemspec /app/
+COPY Gemfile Gemfile.lock ruby-saml2-sans.gemspec /app/
 COPY lib/saml2/version.rb /app/lib/saml2/
 
 RUN bundle config --local frozen true && bundle install -j 4
