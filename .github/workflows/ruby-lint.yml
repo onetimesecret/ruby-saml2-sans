@@ -30,7 +30,7 @@ jobs:
 
       # RuboCop is pinned to TargetRubyVersion 3.2 in .rubocop.yml, so one
       # Ruby is enough; results don't change across the test matrix.
-      - uses: ruby/setup-ruby@984c0c890880bbf811283d6f09c4607c62d210a4 # v1.323.0
+      - uses: ruby/setup-ruby@e8944e80fb94b20106697132f8c20c665fab29e9 # v1.325.0
         with:
           ruby-version: "3.4"
           bundler-cache: true
